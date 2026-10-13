@@ -38,9 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `double-array`s can read `:float` into them. A `:float` widens exactly, and
   a `:double` rounds to single in a `float-array`, as `aset` rounds it. A
   range outside the array, or an array that cannot hold the type's elements,
-  throws before anything is written. The four-argument byte form,
-  `(read-into! p arr off n)` with `off` an index into the byte-array, is
-  unchanged. Not on Gambit.
+  throws before anything is written. A one-byte type fills a `byte-array`,
+  which replaces the removed byte form (see Changed). Not on Gambit.
 - **`jolt.ffi/write-array` writes part of an array.**
   `(ffi/write-array p :float staging offset index count)` writes
   `staging[index, index+count)`, so a staging array sized for the largest batch
@@ -52,6 +51,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING: `ffi/read-into!` and `ffi/write-array` no longer take
+  `(p arr off n)`.** In that form `off` was an index into a byte-array; in
+  babashka.ffi's order, which every other form of both functions now follows,
+  position four is a byte offset into `p`. Unlike `ffi/write`'s move in 0.8.0,
+  this one cannot pass silently: the old call raises, naming its replacement,
+  and reads or writes nothing. The fix is mechanical: give the type and move
+  the two numbers to the end, so `(read-into! p arr off n)` becomes
+  `(read-into! p :byte arr 0 off n)` and `(write-array p arr off n)` becomes
+  `(write-array p :byte arr 0 off n)`. A pointer offset folded into `p`, as in
+  `(read-into! (+ p k) arr off n)`, can move into the zero:
+  `(read-into! p :byte arr k off n)`. `(write-array p arr)` and
+  `(read-array p n)` are unchanged. Every call site in this repository was
+  rewritten.
 - **nREPL eval no longer accepts undefined names; use `declare`.** It bound
   `*allow-unresolved-vars*` to true, so an undefined `x` interned an unbound
   var and returned it, and `(defn f [] later)` compiled a reference to a name
